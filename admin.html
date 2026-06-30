@@ -317,6 +317,7 @@
     <nav>
       <div class="tab active" data-tab="pending">Pending review <span class="badge-count" id="pendingCount" style="display:none;"></span></div>
       <div class="tab" data-tab="visits">Manage visits</div>
+      <div class="tab" data-tab="discharged">Discharged</div>
       <div class="tab" data-tab="wall">Prayer wall</div>
       <div class="tab" data-tab="addvisit">Add visit</div>
     </nav>
@@ -332,6 +333,12 @@
       <div class="screen" id="tab-visits">
         <h2 class="section-title">All Active Care Visits</h2>
         <div id="adminVisitsList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- DISCHARGED VISITS -->
+      <div class="screen" id="tab-discharged">
+        <h2 class="section-title">Discharged Visits</h2>
+        <div id="dischargedList"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- PRAYER WALL MANAGEMENT -->
@@ -462,6 +469,7 @@
         document.getElementById('accessDenied').style.display = 'none';
         loadPending();
         loadAdminVisits();
+        loadDischarged();
         loadWall();
       } else {
         document.getElementById('adminUI').style.display = 'none';
@@ -674,6 +682,67 @@
     if (!confirm('Mark this visit as discharged?')) return;
     await db.collection('visits').doc(id).update({ active: false, dischargedAt: new Date().toISOString() });
     showBanner('Visit closed.');
+  }
+
+  // ── DISCHARGED VISITS ──
+  function loadDischarged() {
+    db.collection('visits')
+      .where('active', '==', false)
+      .orderBy('dischargedAt', 'desc')
+      .onSnapshot(snapshot => {
+        renderDischarged(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, err => {
+        // Likely missing composite index on first run — Firestore will log a console link to create it.
+        document.getElementById('dischargedList').innerHTML =
+          '<div class="empty-state">Could not load discharged visits. Check the browser console for a Firestore index link if this persists.</div>';
+        console.error(err);
+      });
+  }
+
+  function renderDischarged(visits) {
+    const container = document.getElementById('dischargedList');
+    if (!visits.length) {
+      container.innerHTML = `<div class="empty-state">No discharged visits yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = visits.map(v => {
+      const type = v.visitType || 'hospital';
+      const cfg = VISIT_TYPE_CONFIG[type];
+      const visitedNames = (v.visitedBy || []).map(c => c.name).join(', ') || 'Not recorded';
+      const dischargedDate = v.dischargedAt
+        ? new Date(v.dischargedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '';
+
+      return `
+        <div class="card" style="opacity:0.75;">
+          <div class="card-title">${escHtml(v.patientName)}</div>
+          <div class="card-meta" style="margin-bottom:6px;">
+            <span class="tag tag-hidden">${cfg.icon} ${VISIT_TYPE_LABELS[type]}</span>
+            ${dischargedDate ? '<span>Discharged ' + dischargedDate + '</span>' : ''}
+          </div>
+          <div class="card-sub">${escHtml(v.hospital)}</div>
+          <div class="card-text">${escHtml(v.reason)}</div>
+          <div class="card-meta">
+            <span>Visited by: ${escHtml(visitedNames)}</span>
+          </div>
+          <div class="actions">
+            <button class="btn btn-unhide" onclick="restoreVisit('${v.id}')">Restore to active</button>
+            <button class="btn btn-delete" onclick="permanentlyDeleteVisit('${v.id}')">Delete permanently</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function restoreVisit(id) {
+    await db.collection('visits').doc(id).update({ active: true, dischargedAt: firebase.firestore.FieldValue.delete() });
+    showBanner('Visit restored to active list.');
+  }
+
+  async function permanentlyDeleteVisit(id) {
+    if (!confirm('Permanently delete this visit record? This cannot be undone.')) return;
+    await db.collection('visits').doc(id).delete();
+    showBanner('Visit permanently deleted.');
   }
 
   // ── ADD VISIT (admin) ──
