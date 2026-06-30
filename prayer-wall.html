@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prayer Wall</title>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+
+    :root {
+      --bg:         #f7f4f0;
+      --bg-card:    #ffffff;
+      --bg-raised:  #f0ece6;
+      --border:     rgba(0,0,0,0.08);
+      --border-mid: rgba(0,0,0,0.14);
+      --text:       #1a1714;
+      --text-mid:   #5c5650;
+      --text-soft:  #9e9890;
+      --gold:       #9e7a3a;
+      --gold-dim:   rgba(158,122,58,0.10);
+      --gold-glow:  rgba(158,122,58,0.22);
+      --radius:     12px;
+      --radius-sm:  8px;
+      --radius-lg:  18px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      text-align: center;
+      padding: 36px 24px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mark {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-glow);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+
+    .title {
+      font-family: 'Lora', serif;
+      font-size: 30px;
+      font-weight: 500;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .sub {
+      font-size: 15px;
+      color: var(--text-mid);
+      max-width: 360px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 28px 16px 60px;
+    }
+
+    .prayer-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 22px 24px;
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+    }
+
+    .prayer-subject {
+      font-family: 'Lora', serif;
+      font-size: 19px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .prayer-text {
+      font-size: 15px;
+      color: var(--text-mid);
+      margin-bottom: 12px;
+    }
+
+    .prayer-meta {
+      font-size: 13px;
+      color: var(--text-soft);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tag {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--gold-dim);
+      color: var(--gold);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-soft);
+    }
+    .empty-icon {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      margin: 0 auto 16px;
+    }
+    .empty-text { font-size: 17px; color: var(--text-mid); margin-bottom: 6px; font-family: 'Lora', serif; }
+    .empty-sub  { font-size: 14px; color: var(--text-soft); }
+
+    .loading {
+      text-align: center;
+      padding: 48px;
+      color: var(--text-soft);
+      font-size: 15px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 13px;
+      color: var(--text-soft);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 480px) {
+      .title { font-size: 26px; }
+      .prayer-subject { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="mark">🙏</div>
+    <div class="title">Prayer Wall</div>
+    <p class="sub">Lifting up our church family — current needs and requests</p>
+  </header>
+
+  <main>
+    <div id="prayerList"><div class="loading">Loading prayer requests...</div></div>
+  </main>
+
+  <footer>Rochester Christian Church · Bedside</footer>
+
+  <script>
+    const firebaseConfig = {
+      apiKey:            "AIzaSyDFX7_fLi82PqkSUK7mi4bRzOPF1efcAeE",
+      authDomain:        "bedsidercc.firebaseapp.com",
+      projectId:         "bedsidercc",
+      storageBucket:     "bedsidercc.firebasestorage.app",
+      messagingSenderId: "950958384975",
+      appId:             "1:950958384975:web:6f43dec5a7ba842c69c73a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function escHtml(str) {
+      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function formatDate(ts) {
+      if (!ts) return '';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    db.collection('prayerRequests')
+      .where('status', '==', 'public')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        const requests = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPrayerWall(requests);
+      }, err => {
+        document.getElementById('prayerList').innerHTML =
+          '<div class="empty-state"><div class="empty-text">Could not load prayer requests.</div></div>';
+        console.error(err);
+      });
+
+    function renderPrayerWall(requests) {
+      const container = document.getElementById('prayerList');
+
+      if (!requests.length) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🕊️</div>
+            <div class="empty-text">No prayer requests right now</div>
+            <div class="empty-sub">Check back soon.</div>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = requests.map(r => {
+        const tag = r.type === 'hospital_visit' ? 'Care Visit' : 'Prayer Request';
+        const byline = r.anonymous ? 'Submitted anonymously' : (r.submittedBy?.name ? `Shared by ${escHtml(r.submittedBy.name)}` : '');
+
+        return `
+          <div class="prayer-card">
+            <div class="prayer-subject">${escHtml(r.patientName)}</div>
+            <div class="prayer-text">${escHtml(r.text)}</div>
+            <div class="prayer-meta">
+              <span class="tag">${tag}</span>
+              <span>${formatDate(r.createdAt)}</span>
+              ${byline ? '<span>· ' + byline + '</span>' : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

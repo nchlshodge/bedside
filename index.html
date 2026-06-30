@@ -558,7 +558,7 @@
 <div id="loginScreen">
   <div class="login-mark">🕊️</div>
   <div class="login-title">Bedside</div>
-  <p class="login-sub">Coordinating hospital visits for our church family</p>
+  <p class="login-sub">Coordinating care visits for our church family</p>
   <button id="googleSignInBtn">Sign in with Google</button>
 </div>
 
@@ -577,6 +577,7 @@
   <nav>
     <div class="tab active" data-tab="visits">Visits</div>
     <div class="tab" data-tab="add">Add visit</div>
+    <div class="tab" data-tab="prayer">Prayer request</div>
     <div class="tab" data-tab="profile">My profile</div>
   </nav>
 
@@ -584,37 +585,69 @@
 
     <!-- VISITS -->
     <div class="screen active" id="tab-visits">
-      <h2 class="section-title">Who's in the hospital</h2>
+      <h2 class="section-title">Who needs a visit</h2>
       <div id="visitsList"><div class="loading">Loading...</div></div>
     </div>
 
     <!-- ADD VISIT -->
     <div class="screen" id="tab-add">
       <div class="form-card">
-        <div class="form-title">Add a hospital visit</div>
+        <div class="form-title">Add a care visit</div>
 
+        <div class="form-group">
+          <label for="visitType">Visit type</label>
+          <select id="visitType">
+            <option value="hospital">Hospital</option>
+            <option value="homebound">Home-bound</option>
+            <option value="nursing_home">Nursing Home</option>
+            <option value="bereavement">Bereavement</option>
+          </select>
+        </div>
         <div class="form-group">
           <label for="patientName">Person's name</label>
           <input type="text" id="patientName" placeholder="Mary Johnson" />
         </div>
         <div class="form-group">
-          <label for="hospitalName">Hospital</label>
+          <label for="hospitalName" id="locationLabel">Hospital</label>
           <input type="text" id="hospitalName" placeholder="Rochester General" />
         </div>
         <div class="form-group">
-          <label for="visitReason">Reason for stay</label>
+          <label for="visitReason" id="reasonLabel">Reason for stay</label>
           <input type="text" id="visitReason" placeholder="Hip surgery" />
         </div>
         <div class="form-group">
-          <label for="roomNumber">Room number <span style="text-transform:none;letter-spacing:0;font-size:12px;opacity:0.6">(optional)</span></label>
-          <input type="text" id="roomNumber" placeholder="Room 214" />
-        </div>
-        <div class="form-group">
-          <label for="additionalNotes">Notes <span style="text-transform:none;letter-spacing:0;font-size:12px;opacity:0.6">(optional)</span></label>
-          <textarea id="additionalNotes" placeholder="Anything else the team should know..."></textarea>
+          <label for="additionalNotes">Notes <span style="text-transform:none;letter-spacing:0;font-size:12px;opacity:0.6">(optional — room number, address, etc.)</span></label>
+          <textarea id="additionalNotes" placeholder="Room number, address, or anything else the team should know..."></textarea>
         </div>
 
         <button class="btn btn-primary" id="submitVisitBtn">Add this visit</button>
+      </div>
+    </div>
+
+    <!-- PRAYER REQUEST -->
+    <div class="screen" id="tab-prayer">
+      <div class="form-card">
+        <div class="form-title">Submit a prayer request</div>
+        <div class="profile-note">
+          This goes to an admin for review before it's shared on the public prayer wall.
+        </div>
+
+        <div class="form-group">
+          <label for="prayerSubject">Who or what is this for?</label>
+          <input type="text" id="prayerSubject" placeholder="e.g. The Martinez family" />
+        </div>
+        <div class="form-group">
+          <label for="prayerText">Prayer request</label>
+          <textarea id="prayerText" placeholder="Share what's going on and how we can pray..."></textarea>
+        </div>
+        <div class="form-group" style="display:flex; align-items:flex-start; gap:10px; background:var(--bg-raised); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+          <input type="checkbox" id="prayerAnonymous" style="width:auto; margin-top:3px; cursor:pointer;" />
+          <label for="prayerAnonymous" style="margin:0; text-transform:none; letter-spacing:0; font-size:14px; color:var(--text-mid); cursor:pointer; font-weight:400;">
+            Submit anonymously (your name won't be shown on the prayer wall)
+          </label>
+        </div>
+
+        <button class="btn btn-primary" id="submitPrayerBtn">Submit prayer request</button>
       </div>
     </div>
 
@@ -673,6 +706,12 @@
     <div class="form-group">
       <label for="updateText">What would you like to share?</label>
       <textarea id="updateText" placeholder="How are they doing? Anything the team should know?"></textarea>
+    </div>
+    <div class="form-group" style="display:flex; align-items:flex-start; gap:10px; background:var(--bg-raised); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+      <input type="checkbox" id="addToPrayerWall" checked style="width:auto; margin-top:3px; cursor:pointer;" />
+      <label for="addToPrayerWall" style="margin:0; text-transform:none; letter-spacing:0; font-size:14px; color:var(--text-mid); cursor:pointer; font-weight:400;">
+        Share this as a prayer request (an admin will review before it's posted publicly)
+      </label>
     </div>
     <button class="btn btn-primary" id="submitUpdateBtn">Save update</button>
   </div>
@@ -745,6 +784,25 @@ auth.onAuthStateChanged(user => {
   }
 });
 
+// ── VISIT TYPE LABEL SWITCHING ──────────────────────────────────
+const VISIT_TYPE_CONFIG = {
+  hospital:      { locationLabel: 'Hospital',       locationPlaceholder: 'Rochester General', reasonLabel: 'Reason for stay',     reasonPlaceholder: 'Hip surgery',          icon: '🏥' },
+  homebound:     { locationLabel: 'Address / area',  locationPlaceholder: '123 Main St',        reasonLabel: 'Reason for visit',    reasonPlaceholder: 'Recovering from a fall', icon: '🏠' },
+  nursing_home:  { locationLabel: 'Facility name',   locationPlaceholder: 'Sunrise Senior Living', reasonLabel: 'Reason for visit', reasonPlaceholder: 'Long-term care',        icon: '🛏️' },
+  bereavement:   { locationLabel: 'Family / location', locationPlaceholder: 'The Johnson family', reasonLabel: 'Context',          reasonPlaceholder: 'Loss of a spouse',      icon: '🕊️' }
+};
+
+function updateVisitTypeLabels() {
+  const type = document.getElementById('visitType').value;
+  const cfg = VISIT_TYPE_CONFIG[type];
+  document.getElementById('locationLabel').textContent = cfg.locationLabel;
+  document.getElementById('hospitalName').placeholder = cfg.locationPlaceholder;
+  document.getElementById('reasonLabel').textContent = cfg.reasonLabel;
+  document.getElementById('visitReason').placeholder = cfg.reasonPlaceholder;
+}
+
+document.getElementById('visitType').addEventListener('change', updateVisitTypeLabels);
+
 // ── TABS ──────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -785,7 +843,7 @@ function renderVisits(visits) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🏥</div>
-        <div class="empty-text">No one in the hospital right now</div>
+        <div class="empty-text">No active care visits right now</div>
         <div class="empty-sub">Tap "Add visit" to add someone from your church family.</div>
       </div>`;
     return;
@@ -833,7 +891,7 @@ function renderVisits(visits) {
     return `
       <div class="visit-card ${cardClass}">
         <div class="visit-name">${escHtml(v.patientName)}</div>
-        <div class="visit-hospital">${escHtml(v.hospital)}${v.room ? ' · ' + escHtml(v.room) : ''}</div>
+        <div class="visit-hospital">${VISIT_TYPE_CONFIG[v.visitType || 'hospital'].icon} ${escHtml(v.hospital)}</div>
         <div class="visit-reason">${escHtml(v.reason)}</div>
         <div class="visit-status ${statusClass}">${statusLabel}</div>
         <div class="visit-actions">${actions}</div>
@@ -881,14 +939,14 @@ async function archiveVisit(id) {
 
 // ── ADD VISIT ─────────────────────────────────────────────────
 document.getElementById('submitVisitBtn').addEventListener('click', async () => {
+  const visitType   = document.getElementById('visitType').value;
   const patientName = document.getElementById('patientName').value.trim();
   const hospital    = document.getElementById('hospitalName').value.trim();
   const reason      = document.getElementById('visitReason').value.trim();
-  const room        = document.getElementById('roomNumber').value.trim();
   const notes       = document.getElementById('additionalNotes').value.trim();
 
   if (!patientName || !hospital || !reason) {
-    showBanner('Please fill in name, hospital, and reason.', true);
+    showBanner('Please fill in the name, location, and reason.', true);
     return;
   }
 
@@ -896,14 +954,16 @@ document.getElementById('submitVisitBtn').addEventListener('click', async () => 
   const byName  = profile?.name || currentUser.displayName || currentUser.email;
 
   await db.collection('visits').add({
-    patientName, hospital, reason, room, notes,
+    visitType, patientName, hospital, reason, notes,
     active: true, claimedBy: [], visitedBy: [], updates: [],
     createdBy: { uid: currentUser.uid, name: byName },
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  ['patientName','hospitalName','visitReason','roomNumber','additionalNotes']
+  ['patientName','hospitalName','visitReason','additionalNotes']
     .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('visitType').value = 'hospital';
+  updateVisitTypeLabels();
 
   showBanner(`${patientName} has been added.`);
 
@@ -932,6 +992,10 @@ document.getElementById('submitUpdateBtn').addEventListener('click', async () =>
 
   const profile = await getProfile();
   const byName  = profile?.name || currentUser.displayName || currentUser.email;
+  const shareToWall = document.getElementById('addToPrayerWall').checked;
+
+  const visitDoc = await db.collection('visits').doc(currentVisitId).get();
+  const visitData = visitDoc.data();
 
   await db.collection('visits').doc(currentVisitId).update({
     updates: firebase.firestore.FieldValue.arrayUnion({
@@ -939,8 +1003,57 @@ document.getElementById('submitUpdateBtn').addEventListener('click', async () =>
     })
   });
 
+  if (shareToWall) {
+    await db.collection('prayerRequests').add({
+      type: 'hospital_visit',
+      patientName: visitData.patientName,
+      text: text,
+      status: 'pending', // pending | public | hidden
+      sourceVisitId: currentVisitId,
+      submittedBy: { uid: currentUser.uid, name: byName },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
   document.getElementById('updateModal').classList.remove('open');
-  showBanner('Update saved. 🙏');
+  showBanner(shareToWall ? 'Update saved and sent for prayer wall review. 🙏' : 'Update saved. 🙏');
+});
+
+// ── GENERAL PRAYER REQUEST ──────────────────────────────────────
+document.getElementById('submitPrayerBtn').addEventListener('click', async () => {
+  const subject     = document.getElementById('prayerSubject').value.trim();
+  const text        = document.getElementById('prayerText').value.trim();
+  const anonymous   = document.getElementById('prayerAnonymous').checked;
+
+  if (!subject || !text) {
+    showBanner('Please fill in who it\'s for and the request.', true);
+    return;
+  }
+
+  const profile = await getProfile();
+  const byName  = profile?.name || currentUser.displayName || currentUser.email;
+
+  await db.collection('prayerRequests').add({
+    type: 'general',
+    patientName: subject,
+    text: text,
+    status: 'pending',
+    anonymous: anonymous,
+    submittedBy: { uid: currentUser.uid, name: byName },
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  document.getElementById('prayerSubject').value = '';
+  document.getElementById('prayerText').value = '';
+  document.getElementById('prayerAnonymous').checked = false;
+
+  showBanner('Prayer request submitted for review. 🙏');
+
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelector('[data-tab="visits"]').classList.add('active');
+  document.getElementById('tab-visits').classList.add('active');
+  document.getElementById('addVisitFab').style.display = 'block';
 });
 
 // ── PROFILE ───────────────────────────────────────────────────
