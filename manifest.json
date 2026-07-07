@@ -1,0 +1,14 @@
+{
+  "name": "Bedside",
+  "short_name": "Bedside",
+  "description": "Hospital visitation coordination for Rochester Christian Church",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "start_url": "/bedside/",
+  "scope": "/bedside/",
+  "display": "standalone",
+  "background_color": "#faf6ee",
+  "theme_color": "#d4af5f"
+}
