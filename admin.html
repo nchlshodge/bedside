@@ -323,6 +323,7 @@
   <div id="adminUI" style="display:none;">
     <nav>
       <div class="tab active" data-tab="pending">Pending review <span class="badge-count" id="pendingCount" style="display:none;"></span></div>
+      <div class="tab" data-tab="updateApprovals">Update approvals <span class="badge-count" id="updateApprovalsCount" style="display:none;"></span></div>
       <div class="tab" data-tab="visits">Manage visits</div>
       <div class="tab" data-tab="discharged">Discharged</div>
       <div class="tab" data-tab="wall">Prayer wall</div>
@@ -335,6 +336,17 @@
       <div class="screen active" id="tab-pending">
         <h2 class="section-title">Pending Review</h2>
         <div id="pendingList"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- UPDATE APPROVALS -->
+      <div class="screen" id="tab-updateApprovals">
+        <h2 class="section-title">Visit Update Approvals</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            Notes team members log after a visit land here before showing up on the visit card for everyone else to see.
+          </div>
+        </div>
+        <div id="updateApprovalsList"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- MANAGE VISITS -->
@@ -489,6 +501,7 @@
         loadDischarged();
         loadWall();
         loadAdminManagement();
+        loadUpdateApprovals();
       } else {
         document.getElementById('adminUI').style.display = 'none';
         document.getElementById('accessDenied').style.display = 'block';
@@ -527,6 +540,74 @@
         }
       });
   }
+
+  function loadUpdateApprovals() {
+    db.collection('visits').onSnapshot(snapshot => {
+      const pendingUpdates = [];
+      snapshot.docs.forEach(d => {
+        const visit = d.data();
+        (visit.updates || []).forEach(u => {
+          if (u.status === 'pending') {
+            pendingUpdates.push({ visitId: d.id, patientName: visit.patientName, ...u });
+          }
+        });
+      });
+      pendingUpdates.sort((a, b) => new Date(b.at) - new Date(a.at));
+      renderUpdateApprovals(pendingUpdates);
+
+      const badge = document.getElementById('updateApprovalsCount');
+      if (pendingUpdates.length) {
+        badge.textContent = pendingUpdates.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    });
+  }
+
+  function renderUpdateApprovals(items) {
+    const container = document.getElementById('updateApprovalsList');
+    if (!items.length) {
+      container.innerHTML = `<div class="empty-state">Nothing waiting for review. 🎉</div>`;
+      return;
+    }
+
+    container.innerHTML = items.map(u => `
+      <div class="card">
+        <div class="card-title">${escHtml(u.patientName)}</div>
+        <div class="card-text">${escHtml(u.text)}</div>
+        <div class="card-meta">
+          <span>${escHtml(u.byName)} · ${formatAdminDate(u.at)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-approve" onclick="approveVisitUpdate('${u.visitId}', '${u.id}')">Approve</button>
+          <button class="btn btn-delete" onclick="rejectVisitUpdate('${u.visitId}', '${u.id}')">Delete</button>
+        </div>
+      </div>`).join('');
+  }
+
+  function formatAdminDate(iso) {
+    try { return new Date(iso).toLocaleString(); } catch (e) { return ''; }
+  }
+
+  async function approveVisitUpdate(visitId, updateId) {
+    const doc = await db.collection('visits').doc(visitId).get();
+    const updates = (doc.data().updates || []).map(u =>
+      u.id === updateId ? { ...u, status: 'approved' } : u
+    );
+    await db.collection('visits').doc(visitId).update({ updates });
+    showBanner('Update approved and now visible on the visit card.');
+  }
+
+  async function rejectVisitUpdate(visitId, updateId) {
+    if (!confirm('Delete this update? It will not be shown to the team.')) return;
+    const doc = await db.collection('visits').doc(visitId).get();
+    const updates = (doc.data().updates || []).filter(u => u.id !== updateId);
+    await db.collection('visits').doc(visitId).update({ updates });
+    showBanner('Update deleted.');
+  }
+  window.approveVisitUpdate = approveVisitUpdate;
+  window.rejectVisitUpdate = rejectVisitUpdate;
 
   function renderPending(items) {
     const container = document.getElementById('pendingList');

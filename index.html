@@ -898,7 +898,9 @@ function renderVisits(visits) {
       actions += `<button class="btn btn-outline" onclick="openUpdateModal('${v.id}', '${escHtml(v.patientName)}')">Add notes</button>`;
     }
 
-    const updates = (v.updates || []).slice().reverse().map(u => `
+    const updates = (v.updates || [])
+      .filter(u => u.status !== 'pending')
+      .slice().reverse().map(u => `
       <div class="update-item">
         ${escHtml(u.text)}
         <div class="update-meta">${u.byName} · ${formatDate(u.at)}</div>
@@ -1021,7 +1023,9 @@ document.getElementById('submitUpdateBtn').addEventListener('click', async () =>
 
   await db.collection('visits').doc(currentVisitId).update({
     updates: firebase.firestore.FieldValue.arrayUnion({
-      text, byName, uid: currentUser.uid, at: new Date().toISOString()
+      id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      text, byName, uid: currentUser.uid, at: new Date().toISOString(),
+      status: 'pending'
     })
   });
 
@@ -1038,7 +1042,7 @@ document.getElementById('submitUpdateBtn').addEventListener('click', async () =>
   }
 
   document.getElementById('updateModal').classList.remove('open');
-  showBanner(shareToWall ? 'Update saved and sent for prayer wall review. 🙏' : 'Update saved. 🙏');
+  showBanner(shareToWall ? 'Update sent for review (and prayer wall review). 🙏' : 'Update sent for review. 🙏');
 });
 
 // ── GENERAL PRAYER REQUEST ──────────────────────────────────────
