@@ -324,6 +324,7 @@
       <div class="tab" data-tab="discharged">Discharged</div>
       <div class="tab" data-tab="wall">Prayer wall</div>
       <div class="tab" data-tab="addvisit">Add visit</div>
+      <div class="tab" data-tab="admins">Manage admins</div>
     </nav>
 
     <main>
@@ -394,6 +395,17 @@
           <button class="btn-primary-full" id="adminAddVisitBtn">Add visit</button>
         </div>
       </div>
+
+      <!-- MANAGE ADMINS -->
+      <div class="screen" id="tab-admins">
+        <h2 class="section-title">Manage Admins</h2>
+        <div class="card" style="background:var(--gold-dim); border-color:var(--gold-glow); margin-bottom:14px;">
+          <div class="card-text" style="margin-bottom:0;">
+            Anyone toggled on here gets full admin access to this dashboard — including the ability to grant or remove admin access for others. Only toggle this on for people you trust with that.
+          </div>
+        </div>
+        <div id="adminManageList"><div class="loading">Loading...</div></div>
+      </div>
     </main>
   </div>
 
@@ -418,13 +430,9 @@
   const auth = firebase.auth();
   const db   = firebase.firestore();
 
-  // 🔧 Add the email addresses of anyone allowed in the admin dashboard
-  // Add as many as you need — one per line
-  const ADMIN_EMAILS = [
-    "nick@rochesterchristian.church",
-    "stephanie@rcc4me.com",
-    "stephanie@rochesterchristian.church"
-  ];
+  // Admin access is now controlled by the `isAdmin` field on each
+  // person's document in the `users` Firestore collection, managed
+  // from the "Manage Admins" tab below.
 
   // 🔧 Paste your Apps Script Web App URL here (see apps-script.gs deployment instructions)
   // Used by the "Generate & email now" button
@@ -460,13 +468,14 @@
 
   document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
 
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async user => {
     if (user) {
       currentUser = user;
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appShell').style.display = 'block';
 
-      const isAdmin = ADMIN_EMAILS.includes(user.email);
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
       document.getElementById('accessCheck').style.display = 'none';
 
       if (isAdmin) {
@@ -476,6 +485,7 @@
         loadAdminVisits();
         loadDischarged();
         loadWall();
+        loadAdminManagement();
       } else {
         document.getElementById('adminUI').style.display = 'none';
         document.getElementById('accessDenied').style.display = 'block';
@@ -573,6 +583,54 @@
         renderWall(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       });
   }
+
+  function loadAdminManagement() {
+    db.collection('users').onSnapshot(snapshot => {
+      renderAdminManagement(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }
+
+  function renderAdminManagement(users) {
+    const container = document.getElementById('adminManageList');
+    if (!users.length) {
+      container.innerHTML = `<div class="empty-state">No users found yet — people show up here once they sign in and save a profile.</div>`;
+      return;
+    }
+
+    // Sort admins first, then alphabetically by name
+    users.sort((a, b) => {
+      if (!!a.isAdmin !== !!b.isAdmin) return a.isAdmin ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    container.innerHTML = users.map(u => {
+      const isAdmin = u.isAdmin === true;
+      const isSelf = u.id === currentUser.uid;
+      return `
+        <div class="card">
+          <div class="card-title">${escHtml(u.name || '(no name set)')}</div>
+          <div class="card-text" style="margin-bottom:8px;">${escHtml(u.email || '')}</div>
+          <div class="actions">
+            ${isSelf
+              ? `<span class="tag tag-public">You (admin)</span>`
+              : isAdmin
+                ? `<button class="btn btn-hide" onclick="toggleAdmin('${u.id}', false)">Remove admin access</button>`
+                : `<button class="btn btn-unhide" onclick="toggleAdmin('${u.id}', true)">Make admin</button>`}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function toggleAdmin(uid, makeAdmin) {
+    if (makeAdmin && !confirm('Give this person full admin access, including the ability to manage other admins?')) return;
+    if (!makeAdmin && !confirm('Remove admin access for this person?')) return;
+    try {
+      await db.collection('users').doc(uid).set({ isAdmin: makeAdmin }, { merge: true });
+    } catch (e) {
+      showBanner('Could not update admin access: ' + e.message, true);
+    }
+  }
+  window.toggleAdmin = toggleAdmin;
 
   function renderWall(items) {
     const container = document.getElementById('wallList');

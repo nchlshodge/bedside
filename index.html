@@ -583,6 +583,7 @@
     <div class="tab" data-tab="add">Add visit</div>
     <div class="tab" data-tab="prayer">Prayer request</div>
     <div class="tab" data-tab="profile">My profile</div>
+    <div class="tab" id="adminTab" style="display:none;">Admin</div>
   </nav>
 
   <main>
@@ -776,12 +777,21 @@ document.getElementById('googleSignInBtn').addEventListener('click', () => {
 
 document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
 
-auth.onAuthStateChanged(user => {
+// Admin access is controlled by the `isAdmin` field on each person's
+// document in the `users` Firestore collection (managed from the
+// "Manage admins" tab inside admin.html).
+
+auth.onAuthStateChanged(async user => {
   if (user) {
     currentUser = user;
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appShell').style.display    = 'block';
     document.getElementById('userName').textContent      = user.displayName || user.email;
+
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    const isAdmin = userDoc.exists && userDoc.data().isAdmin === true;
+    document.getElementById('adminTab').style.display    = isAdmin ? '' : 'none';
+
     loadProfile();
     subscribeToVisits();
   } else {
@@ -790,6 +800,10 @@ auth.onAuthStateChanged(user => {
     document.getElementById('appShell').style.display    = 'none';
     if (visitsUnsubscribe) visitsUnsubscribe();
   }
+});
+
+document.getElementById('adminTab').addEventListener('click', () => {
+  window.location.href = 'admin.html';
 });
 
 // ── VISIT TYPE LABEL SWITCHING ──────────────────────────────────
