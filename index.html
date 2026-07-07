@@ -660,7 +660,7 @@
       <div class="form-card">
         <div class="form-title">My contact info</div>
         <div class="profile-note">
-          This is how we'll reach you with daily visit reminders — by text and email.
+          Only fill this out if you'd like daily text/email reminders about who needs a visit. You can add someone to the list without signing up for reminders.
         </div>
 
         <div class="form-group">
@@ -688,6 +688,10 @@
             <option value="sms.cricketwireless.net">Cricket</option>
             <option value="other">Other (email only)</option>
           </select>
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" id="profileNotifyOptIn" style="width:auto; margin:0;" />
+          <label for="profileNotifyOptIn" style="margin:0;">Send me daily text/email reminders about who needs a visit</label>
         </div>
 
         <button class="btn btn-primary" id="saveProfileBtn">Save my info</button>
@@ -1074,22 +1078,25 @@ async function loadProfile() {
     document.getElementById('profileEmail').value   = profile.email   || currentUser.email || '';
     document.getElementById('profilePhone').value   = profile.phone   || '';
     document.getElementById('profileCarrier').value = profile.carrier || '';
+    document.getElementById('profileNotifyOptIn').checked = profile.notifyOptIn === true;
   } else {
     document.getElementById('profileEmail').value = currentUser.email || '';
     document.getElementById('profileName').value  = currentUser.displayName || '';
+    document.getElementById('profileNotifyOptIn').checked = false;
   }
 }
 
 document.getElementById('saveProfileBtn').addEventListener('click', async () => {
-  const name    = document.getElementById('profileName').value.trim();
-  const email   = document.getElementById('profileEmail').value.trim();
-  const phone   = document.getElementById('profilePhone').value.trim().replace(/\D/g,'');
-  const carrier = document.getElementById('profileCarrier').value;
+  const name        = document.getElementById('profileName').value.trim();
+  const email       = document.getElementById('profileEmail').value.trim();
+  const phone       = document.getElementById('profilePhone').value.trim().replace(/\D/g,'');
+  const carrier     = document.getElementById('profileCarrier').value;
+  const notifyOptIn = document.getElementById('profileNotifyOptIn').checked;
 
   if (!name || !email) { showBanner('Please enter your name and email.', true); return; }
 
   await db.collection('users').doc(currentUser.uid).set({
-    name, email, phone, carrier, uid: currentUser.uid,
+    name, email, phone, carrier, notifyOptIn, uid: currentUser.uid,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   }, { merge: true });
 
